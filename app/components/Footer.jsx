@@ -16,7 +16,7 @@ import {
 /**
  * Premium Footer — matches Header styling
  * - Same translucent bg + blur + light border as header
- * - Minimal premium nav: Shipping, Return Policy, Warranty, About Us, Contact Us
+ * - Minimal premium nav: Shipping, Return Policy, Warranty, About Us, Contact Us, Admin Panel
  * - Email & WhatsApp quick actions
  * - Framer Motion micro-interactions
  * - Responsive & accessible
@@ -153,6 +153,14 @@ export default function Footer() {
                       className="text-sm text-gray-700 hover:text-indigo-700 transition-colors"
                     >
                       Contact Us
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/admin"
+                      className="text-sm text-gray-500 hover:text-indigo-700 transition-colors"
+                    >
+                      Admin Panel
                     </Link>
                   </li>
                 </ul>

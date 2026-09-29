@@ -1,10 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Star, ChevronDown, ChevronUp } from "lucide-react";
+import { formatImageUrl, getProductImages } from "@/lib/imageUtils";
 
 export default function ProductModal({ product, onClose, onAddToCart }) {
   const [showMore, setShowMore] = useState(false);
+  const allImages = product ? getProductImages(product) : [];
+  const [selectedImg, setSelectedImg] = useState(product?.img || allImages[0]);
+
+  useEffect(() => {
+    if (product) {
+      setSelectedImg(product.img || allImages[0]);
+    }
+  }, [product]);
+
   if (!product) return null;
 
   return (
@@ -33,14 +43,44 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Image */}
-          <div className="relative flex-shrink-0 w-full md:w-1/2 lg:w-2/5 aspect-[4/3] md:aspect-auto bg-gray-50">
+          <div className="relative flex-shrink-0 w-full md:w-1/2 lg:w-2/5 aspect-[4/3] md:aspect-auto bg-gray-50 flex flex-col justify-end">
             <Image
-              src={`/${product.img}`}
+              src={formatImageUrl(selectedImg || product.img)}
               alt={product.name}
               fill
-              className="object-cover rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none"
+              className="object-cover rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none transition-all duration-300"
               sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              unoptimized
             />
+
+            {/* Multiple images thumbnail bar */}
+            {allImages.length > 1 && (
+              <div className="relative z-10 p-2.5 bg-gradient-to-t from-black/60 to-transparent flex items-center justify-center gap-2 overflow-x-auto">
+                {allImages.map((imgUrl, idx) => {
+                  const isActive = (selectedImg || product.img) === imgUrl;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedImg(imgUrl)}
+                      className={`relative w-12 h-9 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 shadow-md ${
+                        isActive
+                          ? "border-indigo-600 ring-2 ring-indigo-400 scale-105"
+                          : "border-white/80 opacity-75 hover:opacity-100"
+                      }`}
+                    >
+                      <Image
+                        src={formatImageUrl(imgUrl)}
+                        alt={`${product.name} angle ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -64,14 +104,14 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
                 <Star
                   key={i}
                   className={`w-4 h-4 ${
-                    i < Math.floor(product.rating)
+                    i < Math.floor(product.rating || 5)
                       ? "fill-yellow-400"
                       : "fill-gray-200"
                   }`}
                 />
               ))}
               <span className="text-sm text-gray-500 ml-1">
-                {product.rating.toFixed(1)}
+                {(product.rating || 4.8).toFixed(1)}
               </span>
             </div>
 
@@ -79,21 +119,21 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
             <div className="flex items-center justify-between mt-3">
               <div>
                 <p className="text-lg font-semibold text-indigo-600">
-                  ₹{product.price.toFixed(0)}
+                  ₹{Number(product.price).toFixed(0)}
                 </p>
                 <p className="text-xs text-gray-400">Incl. taxes</p>
               </div>
               <p
                 className={`text-sm ${
-                  product.stock > 10
+                  (product.stock ?? 10) > 10
                     ? "text-green-600"
-                    : product.stock > 0
+                    : (product.stock ?? 10) > 0
                     ? "text-amber-600"
                     : "text-red-600"
                 }`}
               >
-                {product.stock > 0
-                  ? `${product.stock} in stock`
+                {(product.stock ?? 10) > 0
+                  ? `${product.stock ?? 10} in stock`
                   : "Out of stock"}
               </p>
             </div>

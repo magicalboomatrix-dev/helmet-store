@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Trash2 } from "lucide-react";
+import { formatImageUrl } from "@/lib/imageUtils";
 
 export default function CartDrawer({
   cart,
@@ -12,6 +13,7 @@ export default function CartDrawer({
   onClose,
   updateQty,
   clearCart, 
+  whatsappNumber = "917027888321",
 }) {
   const closeBtnRef = useRef(null);
 
@@ -47,9 +49,6 @@ export default function CartDrawer({
   const setQty = (id, nextQty) => {
     if (nextQty == null) return;
     if (nextQty <= 0) {
-      // treat 0 or -1 as remove
-      if (removeItem) return removeItem(id);
-      // fallback: set to 0 if no removeItem handler exists
       return updateQty?.(id, 0);
     }
     updateQty?.(id, nextQty);
@@ -60,14 +59,10 @@ export default function CartDrawer({
 
   const clearAll = () => {
     if (clearCart) return clearCart();
-    if (removeItem) {
-      const ids = cart.map((x) => x.id);
-      ids.forEach((id) => removeItem(id));
-    }
   };
 
   const handleWhatsAppCheckout = () => {
-    const phone = "917027888321"; 
+    const phone = whatsappNumber || "917027888321"; 
     const total = formatINR(subtotal);
 
     const messageLines = [
@@ -143,11 +138,11 @@ export default function CartDrawer({
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {cart.map((item) => (
               <li
-                key={item.id}
+                key={item.id || item._id}
                 className="py-3 sm:py-4 flex items-center gap-3 sm:gap-4"
               >
                 <img
-                  src={item.img}
+                  src={formatImageUrl(item.img)}
                   alt={item.name}
                   className="w-16 h-12 sm:w-20 sm:h-16 object-cover rounded-md border border-gray-100 dark:border-gray-800"
                 />
@@ -167,7 +162,7 @@ export default function CartDrawer({
                   <div className="mt-2 flex items-center gap-2 sm:gap-3">
                     <div className="flex items-center gap-1 sm:gap-2">
                       <button
-                        onClick={() => dec(item.id, item.qty)}
+                        onClick={() => dec(item.id || item._id, item.qty)}
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-md border border-gray-200 dark:border-gray-800 text-sm hover:bg-gray-50 dark:hover:bg-gray-900"
                         aria-label={`Decrease quantity of ${item.name}`}
                       >
@@ -177,7 +172,7 @@ export default function CartDrawer({
                         {item.qty}
                       </span>
                       <button
-                        onClick={() => inc(item.id, item.qty)}
+                        onClick={() => inc(item.id || item._id, item.qty)}
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-md border border-gray-200 dark:border-gray-800 text-sm hover:bg-gray-50 dark:hover:bg-gray-900"
                         aria-label={`Increase quantity of ${item.name}`}
                       >

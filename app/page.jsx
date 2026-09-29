@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
 import ProductGrid from "./components/ProductGrid";
@@ -8,19 +8,58 @@ import Footer from "./components/Footer";
 import { PRODUCTS } from "./data/data";
 
 export default function HomePage() {
+  const [products, setProducts] = useState(PRODUCTS);
+  const [whatsappNumber, setWhatsappNumber] = useState("917027888321");
   const [cart, setCart] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
 
+  // Fetch dynamic products and WhatsApp settings from MongoDB
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadData() {
+      try {
+        const [prodRes, settRes] = await Promise.all([
+          fetch("/api/products"),
+          fetch("/api/settings"),
+        ]);
+
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          if (isMounted && prodData.products && prodData.products.length > 0) {
+            setProducts(prodData.products);
+          }
+        }
+
+        if (settRes.ok) {
+          const settData = await settRes.json();
+          if (isMounted && settData.settings?.whatsappNumber) {
+            setWhatsappNumber(settData.settings.whatsappNumber);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch store data from API:", err);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleAddToCart = useCallback((product) => {
+    const prodId = product.id || product._id;
     setCart((c) => {
-      const exists = c.find((x) => x.id === product.id);
+      const exists = c.find((x) => (x.id || x._id) === prodId);
       if (exists) {
         return c.map((x) =>
-          x.id === product.id ? { ...x, qty: x.qty + 1 } : x
+          (x.id || x._id) === prodId ? { ...x, qty: x.qty + 1 } : x
         );
       }
-      return [...c, { ...product, qty: 1 }];
+      return [...c, { ...product, id: prodId, qty: 1 }];
     });
     setDrawerOpen(true);
   }, []);
@@ -28,7 +67,7 @@ export default function HomePage() {
   const updateQty = useCallback((id, qty) => {
     setCart((c) =>
       c
-        .map((x) => (x.id === id ? { ...x, qty: Math.max(0, qty) } : x))
+        .map((x) => ((x.id || x._id) === id ? { ...x, qty: Math.max(0, qty) } : x))
         .filter((x) => x.qty > 0)
     );
   }, []);
@@ -62,13 +101,13 @@ export default function HomePage() {
   // Fast + resilient filtering
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return PRODUCTS;
-    return PRODUCTS.filter((p) => {
+    if (!q) return products;
+    return products.filter((p) => {
       const name = p.name?.toLowerCase() ?? "";
       const desc = p.desc?.toLowerCase() ?? "";
       return name.includes(q) || desc.includes(q);
     });
-  }, [query]);
+  }, [products, query]);
 
   const cartCount = useMemo(
     () => cart.reduce((s, p) => s + p.qty, 0),
@@ -120,6 +159,7 @@ export default function HomePage() {
         onClose={() => setDrawerOpen(false)}
         updateQty={updateQty}
         clearCart={clearCart}
+        whatsappNumber={whatsappNumber}
       />
     </div>
   );

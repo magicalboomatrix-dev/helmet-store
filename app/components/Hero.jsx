@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { ShoppingCart } from "lucide-react";
+import { formatImageUrl } from "@/lib/imageUtils";
 
 export default function Hero({ featuredHelmet, onShopNow, onAddToCart }) {
   return (
@@ -64,7 +65,7 @@ export default function Hero({ featuredHelmet, onShopNow, onAddToCart }) {
         <div className="relative">
           <div className="rounded-2xl overflow-hidden shadow-2xl group">
             <img
-              src={featuredHelmet.img}
+              src={formatImageUrl(featuredHelmet.img)}
               alt={featuredHelmet.name}
               className="w-full h-[420px] sm:h-[480px] object-cover transform group-hover:scale-[1.03] transition-transform duration-500"
             />

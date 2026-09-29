@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { formatImageUrl } from "@/lib/imageUtils";
 
 export default function ProductCard({ product, onAddToCart, onQuickView }) {
   return (
@@ -13,10 +14,11 @@ export default function ProductCard({ product, onAddToCart, onQuickView }) {
       <div className="relative w-full overflow-hidden bg-gray-100">
         <div className="relative w-full overflow-hidden bg-gray-100 aspect-[4/3]">
           <Image
-            src={`/${product.img}`}
+            src={formatImageUrl(product.img)}
             alt={product.name}
             fill
             className="object-cover transition-transform duration-300 hover:scale-105"
+            unoptimized
           />
         </div>
       </div>
@@ -44,7 +46,7 @@ export default function ProductCard({ product, onAddToCart, onQuickView }) {
           </div>
           <div className="text-right shrink-0">
             <p className="font-semibold text-gray-800 text-sm sm:text-base">
-              ₹{product.price.toFixed(0)}
+              ₹{Number(product.price).toFixed(0)}
             </p>
             <p className="text-xs text-gray-400">Incl. taxes</p>
           </div>
