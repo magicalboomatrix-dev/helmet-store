@@ -20,12 +20,28 @@ import {
   X,
   Layers,
   Sparkles,
-  ArrowLeft,
   Eye,
+  Lock,
+  LogOut,
+  ShieldCheck,
+  KeyRound,
+  EyeOff,
 } from "lucide-react";
 import { formatImageUrl, getProductImages } from "@/lib/imageUtils";
 
 export default function AdminPage() {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [loginForm, setLoginForm] = useState({
+    email: "admin@helmetstore.com",
+    password: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  // Store & Catalog State
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -72,6 +88,61 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // Check saved session on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("helmet_admin_auth");
+    if (saved === "true") {
+      setIsAuthenticated(true);
+      fetchData();
+    }
+    setAuthChecking(false);
+  }, []);
+
+  // Handle Login
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginError("");
+
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginForm),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Invalid username or password");
+      }
+
+      localStorage.setItem("helmet_admin_auth", "true");
+      setIsAuthenticated(true);
+      fetchData();
+      showToast("Signed in successfully as Admin!");
+    } catch (err) {
+      setLoginError(err.message || "Failed to log in");
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  // Handle Logout
+  const handleLogout = () => {
+    localStorage.removeItem("helmet_admin_auth");
+    setIsAuthenticated(false);
+    showToast("Signed out successfully");
+  };
+
+  // Fill Demo Credentials
+  const fillDemoCredentials = () => {
+    setLoginForm({
+      email: "admin@helmetstore.com",
+      password: "admin123",
+    });
+    setLoginError("");
+  };
+
   // Fetch initial data
   const fetchData = async () => {
     setLoading(true);
@@ -97,10 +168,6 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   // Filtered products
   const filteredProducts = useMemo(() => {
@@ -396,6 +463,144 @@ export default function AdminPage() {
     }));
   };
 
+  // Loading Screen while checking session
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
+        <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  // LOGIN SCREEN (if not authenticated)
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-black/60 relative overflow-hidden">
+          {/* Subtle Glow */}
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Logo & Heading */}
+          <div className="text-center mb-8 relative">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-xl shadow-indigo-500/25 mb-4">
+              HS
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-white">
+              Admin Login
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Sign in to manage helmets, multi-images & WhatsApp orders
+            </p>
+          </div>
+
+          {/* Error Banner */}
+          {loginError && (
+            <div className="mb-5 p-3 rounded-xl bg-red-950/60 border border-red-800/80 text-red-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">
+                Admin Username / Email
+              </label>
+              <input
+                type="text"
+                required
+                value={loginForm.email}
+                onChange={(e) =>
+                  setLoginForm({ ...loginForm, email: e.target.value })
+                }
+                placeholder="admin@helmetstore.com"
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={loginForm.password}
+                  onChange={(e) =>
+                    setLoginForm({ ...loginForm, password: e.target.value })
+                  }
+                  placeholder="Enter admin password"
+                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-200"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loggingIn}
+              className="w-full mt-2 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-indigo-600/30 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loggingIn ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Verifying credentials...</span>
+                </>
+              ) : (
+                <>
+                  <KeyRound className="w-4 h-4" />
+                  <span>Sign In as Admin</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Quick Demo Credentials Autofill */}
+          <div className="mt-6 pt-5 border-t border-slate-800 text-center">
+            <p className="text-xs text-slate-400 mb-2">Default Credentials:</p>
+            <div className="inline-block bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 mb-3">
+              Username: <span className="text-indigo-400">admin@helmetstore.com</span>
+              <br />
+              Password: <span className="text-emerald-400">admin123</span>
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={fillDemoCredentials}
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium underline underline-offset-4"
+              >
+                Auto-fill credentials
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 text-center">
+            <Link
+              href="/"
+              className="text-xs text-slate-500 hover:text-slate-400 inline-flex items-center gap-1"
+            >
+              <span>← Back to storefront</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // MAIN DASHBOARD (when authenticated)
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       {/* Toast Notification */}
@@ -430,8 +635,9 @@ export default function AdminPage() {
                 <h1 className="text-lg font-bold text-white tracking-tight">
                   Helmet Store Admin
                 </h1>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-full">
-                  MongoDB Connected
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Authenticated</span>
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -449,15 +655,25 @@ export default function AdminPage() {
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
+
             <Link
               href="/"
               target="_blank"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition border border-slate-700"
             >
               <Eye className="w-4 h-4" />
-              <span>View Storefront</span>
+              <span className="hidden sm:inline">View Storefront</span>
               <ExternalLink className="w-3 h-3 text-slate-400" />
             </Link>
+
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-medium bg-red-950/50 hover:bg-red-900/60 border border-red-800/80 text-red-300 rounded-lg transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </div>
       </header>
