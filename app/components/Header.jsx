@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { ShoppingCart, Search, X } from "lucide-react";
+import Link from "next/link";
+import { ShoppingCart, Search, X, Truck } from "lucide-react";
 
 export default function Header({
   cartCount = 0,
@@ -76,7 +77,7 @@ export default function Header({
         </div>
 
         {/* Search & Cart */}
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
           {/* Search */}
           <div className="relative flex-1 sm:flex-initial" role="search">
             <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
@@ -99,6 +100,17 @@ export default function Header({
               </button>
             )}
           </div>
+
+          {/* Track Order */}
+          <Link
+            href="/track"
+            className="flex items-center gap-1.5 bg-white/90 border border-gray-200 px-3 py-2 rounded-full shadow-sm hover:shadow-md hover:border-indigo-300 transition-all flex-shrink-0 backdrop-blur-sm text-gray-700 hover:text-indigo-600"
+            aria-label="Track Order"
+            title="Track Your Order"
+          >
+            <Truck size={17} />
+            <span className="hidden md:inline text-sm font-medium">Track</span>
+          </Link>
 
           {/* Cart */}
           <button

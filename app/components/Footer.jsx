@@ -120,6 +120,14 @@ export default function Footer() {
                   </li>
                   <li>
                     <Link
+                      href="/track"
+                      className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      Track Your Order
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       href="/return-policy"
                       className="text-sm text-gray-700 hover:text-indigo-700 transition-colors"
                     >

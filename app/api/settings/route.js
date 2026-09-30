@@ -11,6 +11,9 @@ export async function GET() {
         key: "store_settings",
         whatsappNumber: "917027888321",
         storeName: "Helmet Store",
+        upiId: "helmetstore@upi",
+        upiPayeeName: "Helmet Store",
+        originCity: "Central Warehouse, New Delhi",
       });
     }
     return NextResponse.json({ success: true, settings });
@@ -21,6 +24,9 @@ export async function GET() {
       settings: {
         whatsappNumber: "917027888321",
         storeName: "Helmet Store",
+        upiId: "helmetstore@upi",
+        upiPayeeName: "Helmet Store",
+        originCity: "Central Warehouse, New Delhi",
       },
       error: error.message,
     });
@@ -31,7 +37,7 @@ export async function PUT(request) {
   try {
     await connectToDatabase();
     const body = await request.json();
-    const { whatsappNumber, storeName } = body;
+    const { whatsappNumber, storeName, upiId, upiPayeeName, originCity } = body;
 
     let settings = await Settings.findOne({ key: "store_settings" });
     if (!settings) {
@@ -44,7 +50,19 @@ export async function PUT(request) {
     }
 
     if (storeName !== undefined) {
-      settings.storeName = storeName;
+      settings.storeName = storeName.trim();
+    }
+
+    if (upiId !== undefined) {
+      settings.upiId = upiId.trim();
+    }
+
+    if (upiPayeeName !== undefined) {
+      settings.upiPayeeName = upiPayeeName.trim();
+    }
+
+    if (originCity !== undefined) {
+      settings.originCity = originCity.trim();
     }
 
     await settings.save();
