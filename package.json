@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "cloudinary": "^2.11.0",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.547.0",
     "mongoose": "^9.10.2",

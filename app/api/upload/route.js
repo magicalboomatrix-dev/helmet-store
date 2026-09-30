@@ -1,43 +1,45 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import cloudinary from "@/lib/cloudinary";
 
 export async function POST(request) {
   try {
     const formData = await request.formData();
-    const files = formData.getAll("files");
+    let files = formData.getAll("files");
 
     if (!files || files.length === 0) {
-      // Check for single file "file"
       const singleFile = formData.get("file");
       if (singleFile && typeof singleFile === "object" && singleFile.name) {
-        files.push(singleFile);
+        files = [singleFile];
       }
     }
 
-    if (files.length === 0) {
+    if (!files || files.length === 0) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
-
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadDir, { recursive: true });
 
     const uploadedUrls = [];
 
     for (const file of files) {
       if (typeof file === "string") continue;
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
-      const ext = path.extname(file.name) || ".jpg";
-      const sanitizedName = file.name
-        .replace(/[^a-zA-Z0-9.-]/g, "_")
-        .replace(ext, "");
-      const fileName = `${Date.now()}-${sanitizedName}${ext}`;
-      const filePath = path.join(uploadDir, fileName);
+      // Upload buffer to Cloudinary
+      const secureUrl = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "helmet-store",
+            resource_type: "image",
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result.secure_url);
+          }
+        );
+        uploadStream.end(buffer);
+      });
 
-      await writeFile(filePath, buffer);
-      uploadedUrls.push(`/uploads/${fileName}`);
+      uploadedUrls.push(secureUrl);
     }
 
     return NextResponse.json({
@@ -46,9 +48,9 @@ export async function POST(request) {
       url: uploadedUrls[0] || null,
     });
   } catch (error) {
-    console.error("Upload error:", error);
+    console.error("Cloudinary upload error:", error);
     return NextResponse.json(
-      { error: "Failed to upload file(s): " + error.message },
+      { error: "Failed to upload image to Cloudinary: " + error.message },
       { status: 500 }
     );
   }
