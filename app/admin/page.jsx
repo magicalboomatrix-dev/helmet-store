@@ -34,7 +34,7 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
   const [loginForm, setLoginForm] = useState({
-    email: "admin@helmetstore.com",
+    email: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -132,15 +132,6 @@ export default function AdminPage() {
     localStorage.removeItem("helmet_admin_auth");
     setIsAuthenticated(false);
     showToast("Signed out successfully");
-  };
-
-  // Fill Demo Credentials
-  const fillDemoCredentials = () => {
-    setLoginForm({
-      email: "admin@helmetstore.com",
-      password: "admin123",
-    });
-    setLoginError("");
   };
 
   // Fetch initial data
@@ -568,29 +559,10 @@ export default function AdminPage() {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Autofill */}
           <div className="mt-6 pt-5 border-t border-slate-800 text-center">
-            <p className="text-xs text-slate-400 mb-2">Default Credentials:</p>
-            <div className="inline-block bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 mb-3">
-              Username: <span className="text-indigo-400">admin@helmetstore.com</span>
-              <br />
-              Password: <span className="text-emerald-400">admin123</span>
-            </div>
-            <div>
-              <button
-                type="button"
-                onClick={fillDemoCredentials}
-                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium underline underline-offset-4"
-              >
-                Auto-fill credentials
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5 text-center">
             <Link
               href="/"
-              className="text-xs text-slate-500 hover:text-slate-400 inline-flex items-center gap-1"
+              className="text-xs text-slate-500 hover:text-slate-400 inline-flex items-center gap-1 transition"
             >
               <span>← Back to storefront</span>
             </Link>
