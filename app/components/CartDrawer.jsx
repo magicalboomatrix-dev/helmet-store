@@ -170,7 +170,7 @@ export default function CartDrawer({
     }
   };
 
-  const Content = ({ compact = false }) => (
+  const renderContent = (compact = false) => (
     <div className={`h-full flex flex-col ${compact ? "p-4" : "p-6"}`}>
       {view === "cart" ? (
         <>
@@ -539,7 +539,7 @@ export default function CartDrawer({
             <div className="absolute left-1/2 -top-3 h-6 -translate-x-1/2">
               <div className="mx-auto h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
             </div>
-            <Content compact />
+            {renderContent(true)}
           </motion.aside>
         )}
       </AnimatePresence>
@@ -558,7 +558,7 @@ export default function CartDrawer({
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
           >
-            <Content />
+            {renderContent()}
           </motion.aside>
         )}
       </AnimatePresence>

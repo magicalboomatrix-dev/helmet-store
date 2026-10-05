@@ -8,10 +8,10 @@ const ProductSchema = new mongoose.Schema(
     images: { type: [String], default: [] },
     desc: { type: String, default: "", trim: true },
     features: { type: [String], default: [] },
-    rating: { type: Number, default: 4.8 },
-    stock: { type: Number, default: 10 },
+    rating: { type: Number, default: 0 },
+    stock: { type: Number, default: 0 },
     colors: { type: [String], default: [] },
-    weight: { type: String, default: "1.3 kg", trim: true },
+    weight: { type: String, default: "", trim: true },
     isFeatured: { type: Boolean, default: false },
   },
   {

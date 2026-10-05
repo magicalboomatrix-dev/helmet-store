@@ -1,4 +1,17 @@
 import { NextResponse } from "next/server";
+import {
+  ADMIN_SESSION_COOKIE,
+  adminSessionCookieOptions,
+  createAdminSession,
+  isAdminRequest,
+} from "@/lib/adminAuth";
+
+export async function GET(request) {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ success: false }, { status: 401 });
+  }
+  return NextResponse.json({ success: true });
+}
 
 export async function POST(request) {
   try {
@@ -24,7 +37,7 @@ export async function POST(request) {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: "Authentication successful",
       user: {
@@ -32,6 +45,8 @@ export async function POST(request) {
         role: "admin",
       },
     });
+    response.cookies.set(ADMIN_SESSION_COOKIE, createAdminSession(), adminSessionCookieOptions);
+    return response;
   } catch (error) {
     console.error("Login API error:", error);
     return NextResponse.json(
@@ -39,4 +54,13 @@ export async function POST(request) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE() {
+  const response = NextResponse.json({ success: true });
+  response.cookies.set(ADMIN_SESSION_COOKIE, "", {
+    ...adminSessionCookieOptions,
+    maxAge: 0,
+  });
+  return response;
 }

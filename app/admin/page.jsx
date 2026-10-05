@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   X,
   Layers,
-  Sparkles,
   Eye,
   Lock,
   LogOut,
@@ -81,17 +80,17 @@ export default function AdminPage() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [seeding, setSeeding] = useState(false);
+  const [clearingCatalog, setClearingCatalog] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
     name: "",
     price: "",
-    stock: "10",
-    weight: "1.3 kg",
-    rating: "4.8",
+    stock: "0",
+    weight: "",
+    rating: "0",
     desc: "",
-    img: "1.jpg",
+    img: "",
     images: [],
     colors: [],
     features: [],
@@ -111,12 +110,27 @@ export default function AdminPage() {
 
   // Check saved session on mount
   useEffect(() => {
-    const saved = localStorage.getItem("helmet_admin_auth");
-    if (saved === "true") {
-      setIsAuthenticated(true);
-      fetchData();
-    }
-    setAuthChecking(false);
+    const validateSession = async () => {
+      if (localStorage.getItem("helmet_admin_auth") !== "true") {
+        setAuthChecking(false);
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/admin/login");
+        if (!response.ok) {
+          localStorage.removeItem("helmet_admin_auth");
+          return;
+        }
+        setIsAuthenticated(true);
+        fetchData();
+      } catch {
+        localStorage.removeItem("helmet_admin_auth");
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+    validateSession();
   }, []);
 
   // Handle Login
@@ -150,6 +164,7 @@ export default function AdminPage() {
 
   // Handle Logout
   const handleLogout = () => {
+    fetch("/api/admin/login", { method: "DELETE" }).catch(() => {});
     localStorage.removeItem("helmet_admin_auth");
     setIsAuthenticated(false);
     showToast("Signed out successfully");
@@ -215,6 +230,33 @@ export default function AdminPage() {
     }
   };
 
+  const handleReviewPayment = async (orderId, action, reviewNote = "") => {
+    setUpdatingOrderId(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/payment-proof`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reviewNote }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Could not review payment proof");
+      }
+
+      setOrders((prev) => prev.map((order) =>
+        order.orderId === orderId ? data.order : order
+      ));
+      setSelectedOrder(data.order);
+      showToast(action === "approve"
+        ? `Payment verified for ${orderId}; tracking is now active.`
+        : `Payment proof rejected for ${orderId}.`);
+    } catch (err) {
+      showToast(err.message || "Could not review payment proof", "error");
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
   // Order Delete handler
   const handleDeleteOrder = async (orderId) => {
     try {
@@ -269,18 +311,14 @@ export default function AdminPage() {
     setFormData({
       name: "",
       price: "",
-      stock: "10",
-      weight: "1.3 kg",
-      rating: "4.8",
+      stock: "0",
+      weight: "",
+      rating: "0",
       desc: "",
-      img: "1.jpg",
-      images: ["1.jpg"],
-      colors: ["Matte Black"],
-      features: [
-        "Lightweight impact-resistant shell",
-        "Anti-fog quick release visor",
-        "Breathable comfort liner",
-      ],
+      img: "",
+      images: [],
+      colors: [],
+      features: [],
       isFeatured: false,
     });
     setColorInput("");
@@ -296,9 +334,9 @@ export default function AdminPage() {
     setFormData({
       name: p.name || "",
       price: String(p.price || ""),
-      stock: String(p.stock ?? 10),
-      weight: p.weight || "1.3 kg",
-      rating: String(p.rating || 4.8),
+      stock: String(p.stock ?? 0),
+      weight: p.weight || "",
+      rating: String(p.rating ?? 0),
       desc: p.desc || "",
       img: p.img || (allImgs[0] ? allImgs[0] : "1.jpg"),
       images: allImgs,
@@ -408,26 +446,23 @@ export default function AdminPage() {
     }
   };
 
-  // Seed Catalog
-  const handleSeedDatabase = async (force = false) => {
-    setSeeding(true);
+  // Remove all catalog products before adding the client's real inventory.
+  const handleClearCatalog = async () => {
+    setClearingCatalog(true);
     try {
-      const res = await fetch("/api/seed", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force }),
-      });
+      const res = await fetch("/api/products", { method: "DELETE" });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to seed database");
+        throw new Error(data.error || "Failed to clear catalog");
       }
-      showToast(data.message || "Database seeded successfully!");
-      fetchData();
+      setProducts([]);
+      setSearch("");
+      showToast(data.message || "Catalog cleared successfully!");
     } catch (err) {
-      console.error("Seed error:", err);
-      showToast(err.message || "Seeding failed", "error");
+      console.error("Catalog clear error:", err);
+      showToast(err.message || "Failed to clear catalog", "error");
     } finally {
-      setSeeding(false);
+      setClearingCatalog(false);
     }
   };
 
@@ -869,8 +904,8 @@ export default function AdminPage() {
                 : "text-slate-400 hover:text-white hover:bg-slate-800"
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>Catalog Seeder</span>
+            <Trash2 className="w-4 h-4" />
+            <span>Catalog Cleanup</span>
           </button>
         </div>
 
@@ -924,7 +959,7 @@ export default function AdminPage() {
                     ) : filteredProducts.length === 0 ? (
                       <tr>
                         <td colSpan="6" className="text-center py-12 text-slate-400">
-                          No helmets found. Click "Add New Helmet" or run the Seeder!
+                          No products in the catalog yet. Add the client’s verified helmets and prices to publish them.
                         </td>
                       </tr>
                     ) : (
@@ -965,14 +1000,14 @@ export default function AdminPage() {
                             <td className="px-4 py-3">
                               <span
                                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  (p.stock ?? 10) > 10
+                                  (p.stock ?? 0) > 10
                                     ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                    : (p.stock ?? 10) > 0
+                                    : (p.stock ?? 0) > 0
                                     ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                     : "bg-red-500/20 text-red-400 border border-red-500/30"
                                 }`}
                               >
-                                {p.stock ?? 10} in stock
+                                {p.stock ?? 0} in stock
                               </span>
                             </td>
 
@@ -988,7 +1023,7 @@ export default function AdminPage() {
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1 text-amber-400 font-medium text-xs">
                                 <Star className="w-3.5 h-3.5 fill-amber-400" />
-                                <span>{p.rating ?? 4.8}</span>
+                                <span>{p.rating ?? 0}</span>
                               </div>
                             </td>
 
@@ -1045,6 +1080,11 @@ export default function AdminPage() {
                     id: "Pending",
                     label: "Pending",
                     count: orders.filter((o) => o.paymentStatus === "Pending").length,
+                  },
+                  {
+                    id: "Proof Submitted",
+                    label: "Proof Review",
+                    count: orders.filter((o) => o.paymentStatus === "Proof Submitted").length,
                   },
                   {
                     id: "Paid",
@@ -1164,33 +1204,30 @@ export default function AdminPage() {
                               ₹{o.total}
                             </td>
 
-                            {/* Payment Status + Quick Toggle */}
+                            {/* Payment Status */}
                             <td className="px-4 py-3.5">
                               <div className="space-y-1">
                                 <span
                                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
                                     o.paymentStatus === "Paid"
                                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                      : o.paymentStatus === "Proof Submitted"
+                                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                                      : o.paymentStatus === "Proof Rejected"
+                                      ? "bg-red-500/20 text-red-300 border border-red-500/30"
                                       : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                   }`}
                                 >
                                   {o.paymentStatus}
                                 </span>
-
-                                <div>
+                                {o.paymentProof?.imageUrl && o.paymentStatus !== "Paid" && (
                                   <button
-                                    onClick={() =>
-                                      handleUpdateOrder(o.orderId, {
-                                        paymentStatus:
-                                          o.paymentStatus === "Paid" ? "Pending" : "Paid",
-                                      })
-                                    }
-                                    disabled={updatingOrderId === o.orderId}
-                                    className="text-[11px] text-slate-400 hover:text-indigo-400 underline transition"
+                                    onClick={() => setSelectedOrder(o)}
+                                    className="block text-[11px] text-indigo-400 hover:text-indigo-300 underline"
                                   >
-                                    {o.paymentStatus === "Paid" ? "Mark Pending" : "Mark as Paid"}
+                                    Review proof
                                   </button>
-                                </div>
+                                )}
                               </div>
                             </td>
 
@@ -1419,17 +1456,16 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 3: SEEDER */}
+        {/* TAB 3: CATALOG CLEANUP */}
         {activeTab === "seed" && (
           <div className="max-w-2xl bg-slate-800/40 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
             <div>
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-indigo-400" />
-                <span>MongoDB Catalog Seeder</span>
+                <Package className="w-5 h-5 text-indigo-400" />
+                <span>Replace Sample Catalog</span>
               </h2>
               <p className="text-sm text-slate-400 mt-1">
-                Populate your MongoDB database with all 27 original helmets from{" "}
-                <code className="text-indigo-300">app/data/data.js</code>.
+                Remove the {products.length} current product{products.length === 1 ? "" : "s"}, then add the client’s real helmets and verified prices from Products Catalog.
               </p>
             </div>
 
@@ -1437,48 +1473,24 @@ export default function AdminPage() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-slate-300 leading-relaxed">
-                  <p className="font-semibold text-slate-200">
-                    How the Seeder Works:
-                  </p>
-                  <p className="mt-1">
-                    • <strong>Safe Seed (Default)</strong>: Will only insert helmets if the database is currently empty.
-                  </p>
-                  <p className="mt-0.5">
-                    • <strong>Force Reset</strong>: Clears all products from MongoDB and re-inserts the 27 original helmets cleanly.
-                  </p>
+                  <p className="font-semibold text-slate-200">This permanently deletes every product in the catalog.</p>
+                  <p className="mt-1">The sample products will not be re-created automatically. Orders and store settings are kept.</p>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => handleSeedDatabase(false)}
-                disabled={seeding}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition shadow-md disabled:opacity-50 flex items-center gap-2"
-              >
-                {seeding ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
-                <span>Seed Database (If Empty)</span>
-              </button>
-
-              <button
                 onClick={() => {
-                  if (
-                    confirm(
-                      "Are you sure you want to reset the catalog? This will overwrite existing products with the 27 starter helmets."
-                    )
-                  ) {
-                    handleSeedDatabase(true);
+                  if (products.length > 0 && confirm(`Delete all ${products.length} products? This cannot be undone.`)) {
+                    handleClearCatalog();
                   }
                 }}
-                disabled={seeding}
+                disabled={clearingCatalog || products.length === 0}
                 className="px-5 py-2.5 bg-red-900/40 hover:bg-red-900/60 border border-red-700 text-red-200 font-semibold text-sm rounded-xl transition shadow-md disabled:opacity-50 flex items-center gap-2"
               >
-                <Trash2 className="w-4 h-4" />
-                <span>Force Reset & Seed 27 Helmets</span>
+                {clearingCatalog ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                <span>{clearingCatalog ? "Removing Products..." : `Delete All ${products.length} Products`}</span>
               </button>
             </div>
           </div>
@@ -1523,7 +1535,7 @@ export default function AdminPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
-                    placeholder="e.g. Aether Carbon Ultra"
+                    placeholder="Enter the actual brand and model"
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -1628,7 +1640,7 @@ export default function AdminPage() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Or enter image filename/URL (e.g. 5.jpg or https://...)"
+                    placeholder="Paste the real product image URL or filename"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -1902,6 +1914,10 @@ export default function AdminPage() {
                       className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         selectedOrder.paymentStatus === "Paid"
                           ? "bg-emerald-500/20 text-emerald-400"
+                          : selectedOrder.paymentStatus === "Proof Submitted"
+                          ? "bg-indigo-500/20 text-indigo-300"
+                          : selectedOrder.paymentStatus === "Proof Rejected"
+                          ? "bg-red-500/20 text-red-300"
                           : "bg-amber-500/20 text-amber-400"
                       }`}
                     >
@@ -1928,21 +1944,14 @@ export default function AdminPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
                 <div>
                   <label className="block text-xs uppercase font-semibold text-slate-400 mb-1.5">
-                    Payment Status
+                    Payment Verification
                   </label>
-                  <select
-                    value={selectedOrder.paymentStatus}
-                    onChange={(e) =>
-                      handleUpdateOrder(selectedOrder.orderId, {
-                        paymentStatus: e.target.value,
-                      })
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="Pending">Pending (Awaiting UPI)</option>
-                    <option value="Paid">Paid (Verified)</option>
-                    <option value="Failed">Failed / Cancelled</option>
-                  </select>
+                  <p className={`text-sm font-bold ${selectedOrder.paymentStatus === "Paid" ? "text-emerald-400" : "text-amber-300"}`}>
+                    {selectedOrder.paymentStatus}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Tracking starts only after payment proof is approved.
+                  </p>
                 </div>
 
                 <div>
@@ -1967,6 +1976,56 @@ export default function AdminPage() {
                     <option value="Delivered">6. Delivered</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Payment proof review */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs uppercase font-semibold text-indigo-400">Payment Screenshot</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {selectedOrder.paymentProof?.submittedAt
+                        ? `Uploaded ${new Date(selectedOrder.paymentProof.submittedAt).toLocaleString("en-IN")}`
+                        : "Customer has not uploaded proof yet."}
+                    </p>
+                  </div>
+                  {selectedOrder.paymentProof?.imageUrl && (
+                    <a href={selectedOrder.paymentProof.imageUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-300 underline">
+                      Open full size
+                    </a>
+                  )}
+                </div>
+                {selectedOrder.paymentProof?.imageUrl ? (
+                  <a href={selectedOrder.paymentProof.imageUrl} target="_blank" rel="noreferrer" className="block w-fit">
+                    <img src={selectedOrder.paymentProof.imageUrl} alt={`Payment proof for ${selectedOrder.orderId}`} className="max-h-64 max-w-full rounded-xl border border-slate-700 object-contain" />
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-500">Waiting for the customer to submit their UPI payment screenshot.</p>
+                )}
+                {selectedOrder.paymentProof?.reviewNote && (
+                  <p className="text-xs text-amber-300">Review note: {selectedOrder.paymentProof.reviewNote}</p>
+                )}
+                {selectedOrder.paymentProof?.imageUrl && selectedOrder.paymentStatus !== "Paid" && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      onClick={() => handleReviewPayment(selectedOrder.orderId, "approve")}
+                      disabled={updatingOrderId === selectedOrder.orderId}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold disabled:opacity-50"
+                    >
+                      Verify Payment & Place Order
+                    </button>
+                    <button
+                      onClick={() => {
+                        const note = window.prompt("Optional reason for rejecting this proof:") || "";
+                        handleReviewPayment(selectedOrder.orderId, "reject", note);
+                      }}
+                      disabled={updatingOrderId === selectedOrder.orderId}
+                      className="px-4 py-2 rounded-lg bg-red-900/50 hover:bg-red-900/70 border border-red-800 text-red-200 text-xs font-semibold disabled:opacity-50"
+                    >
+                      Reject Proof
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Customer Delivery Details */}

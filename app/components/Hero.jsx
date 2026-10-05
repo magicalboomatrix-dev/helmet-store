@@ -30,38 +30,10 @@ export default function Hero({ featuredHelmet, onShopNow, onAddToCart }) {
             </button>
           </div>
 
-          {/* TRUST BADGES */}
-          <div className="mt-10 flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="bg-white rounded-full p-2 shadow">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden
-                >
-                  <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.402 8.17L12 18.896 4.664 23.167l1.402-8.17L0.132 9.21l8.2-1.192z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold">4.9 Avg. rating</p>
-                <p className="text-xs text-gray-500">from 2,134 riders</p>
-              </div>
-            </div>
-
-            <div className="h-8 w-px bg-gray-200" />
-
-            <div>
-              <p className="text-sm font-semibold">Fast Shipping</p>
-              <p className="text-xs text-gray-500">
-                Priority delivery across India
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* RIGHT SIDE — FEATURED HELMET */}
+        {featuredHelmet ? (
         <div className="relative">
           <div className="rounded-2xl overflow-hidden shadow-2xl group">
             <img
@@ -79,6 +51,9 @@ export default function Hero({ featuredHelmet, onShopNow, onAddToCart }) {
             <p className="font-semibold mt-1 text-gray-900">
               {featuredHelmet.name}
             </p>
+            <p className="text-sm font-semibold text-indigo-600 mt-1">
+              ₹{Number(featuredHelmet.price).toLocaleString("en-IN")}
+            </p>
             <p className="text-sm mt-2 text-gray-600 line-clamp-2">
               {featuredHelmet.description}
             </p>
@@ -91,6 +66,14 @@ export default function Hero({ featuredHelmet, onShopNow, onAddToCart }) {
             </button>
           </div>
         </div>
+        ) : (
+          <div className="min-h-[300px] rounded-2xl border border-dashed border-gray-300 bg-white/70 flex items-center justify-center p-8 text-center">
+            <div>
+              <p className="text-lg font-semibold text-gray-800">New collection coming soon</p>
+              <p className="mt-2 text-sm text-gray-500">We’re updating the catalog with the store’s current products and prices.</p>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

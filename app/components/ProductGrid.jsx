@@ -18,6 +18,12 @@ export default function ProductGrid({ products, onAddToCart }) {
         ))}
       </div>
 
+      {products.length === 0 && (
+        <p className="py-16 text-center text-gray-500">
+          Our updated helmet collection is coming soon.
+        </p>
+      )}
+
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}

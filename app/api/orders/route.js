@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
+import { isAdminRequest } from "@/lib/adminAuth";
 
 export async function GET(request) {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ success: false, error: "Admin sign-in required." }, { status: 401 });
+  }
+
   try {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);

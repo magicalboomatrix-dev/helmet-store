@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Star, ChevronDown, ChevronUp } from "lucide-react";
@@ -8,12 +8,6 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
   const [showMore, setShowMore] = useState(false);
   const allImages = product ? getProductImages(product) : [];
   const [selectedImg, setSelectedImg] = useState(product?.img || allImages[0]);
-
-  useEffect(() => {
-    if (product) {
-      setSelectedImg(product.img || allImages[0]);
-    }
-  }, [product]);
 
   if (!product) return null;
 
@@ -104,14 +98,14 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
                 <Star
                   key={i}
                   className={`w-4 h-4 ${
-                    i < Math.floor(product.rating || 5)
+                    i < Math.floor(product.rating ?? 0)
                       ? "fill-yellow-400"
                       : "fill-gray-200"
                   }`}
                 />
               ))}
               <span className="text-sm text-gray-500 ml-1">
-                {(product.rating || 4.8).toFixed(1)}
+                {product.rating > 0 ? product.rating.toFixed(1) : "No ratings yet"}
               </span>
             </div>
 
@@ -125,15 +119,15 @@ export default function ProductModal({ product, onClose, onAddToCart }) {
               </div>
               <p
                 className={`text-sm ${
-                  (product.stock ?? 10) > 10
+                  (product.stock ?? 0) > 10
                     ? "text-green-600"
-                    : (product.stock ?? 10) > 0
+                    : (product.stock ?? 0) > 0
                     ? "text-amber-600"
                     : "text-red-600"
                 }`}
               >
-                {(product.stock ?? 10) > 0
-                  ? `${product.stock ?? 10} in stock`
+                {(product.stock ?? 0) > 0
+                  ? `${product.stock ?? 0} in stock`
                   : "Out of stock"}
               </p>
             </div>

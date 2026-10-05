@@ -5,10 +5,9 @@ import Hero from "./components/Hero";
 import ProductGrid from "./components/ProductGrid";
 import CartDrawer from "./components/CartDrawer";
 import Footer from "./components/Footer";
-import { PRODUCTS } from "./data/data";
 
 export default function HomePage() {
-  const [products, setProducts] = useState(PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState("917027888321");
   const [cart, setCart] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -27,7 +26,7 @@ export default function HomePage() {
 
         if (prodRes.ok) {
           const prodData = await prodRes.json();
-          if (isMounted && prodData.products && prodData.products.length > 0) {
+          if (isMounted && prodData.success && Array.isArray(prodData.products)) {
             setProducts(prodData.products);
           }
         }
@@ -113,6 +112,7 @@ export default function HomePage() {
     () => cart.reduce((s, p) => s + p.qty, 0),
     [cart]
   );
+  const featuredProduct = products.find((product) => product.isFeatured) || products[0];
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -125,13 +125,11 @@ export default function HomePage() {
       />
 
       <Hero
-        featuredHelmet={{
-          id: "featured-1",
-          name: "Aether Carbon — Urban",
-          description: "Lightweight. Magnetic visor. City-ready.",
-          img: "5.jpg",
-          price: 7499,
-        }}
+        featuredHelmet={
+          featuredProduct
+            ? { ...featuredProduct, description: featuredProduct.desc }
+            : null
+        }
         onShopNow={() => {
           document
             .getElementById("shop-section")

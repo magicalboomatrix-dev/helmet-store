@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useCallback, useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { QRCodeSVG } from "qrcode.react";
@@ -22,6 +22,7 @@ import {
   QrCode,
   Smartphone,
   Navigation,
+  Upload,
 } from "lucide-react";
 import { formatImageUrl } from "@/lib/imageUtils";
 
@@ -35,9 +36,13 @@ export default function OrderConfirmationPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copiedUPI, setCopiedUPI] = useState(false);
+  const [proofFile, setProofFile] = useState(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [proofError, setProofError] = useState("");
+  const proofInputRef = useRef(null);
 
-  const fetchOrderDetails = async () => {
-    setLoading(true);
+  const fetchOrderDetails = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true);
     setError("");
     try {
       const res = await fetch(`/api/orders/${orderId}`);
@@ -50,9 +55,42 @@ export default function OrderConfirmationPage({ params }) {
       setSettings(data.settings);
     } catch (err) {
       console.error("Order fetch error:", err);
-      setError(err.message || "Could not load order details.");
+      if (!quiet) {
+        setError(err.message || "Could not load order details.");
+      }
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
+    }
+  }, [orderId]);
+
+  const handleUploadProof = async (event) => {
+    event.preventDefault();
+    if (!proofFile) {
+      setProofError("Choose your payment screenshot first.");
+      return;
+    }
+
+    setUploadingProof(true);
+    setProofError("");
+    try {
+      const payload = new FormData();
+      payload.append("proof", proofFile);
+      const response = await fetch(`/api/orders/${orderId}/payment-proof`, {
+        method: "POST",
+        body: payload,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Could not upload payment screenshot.");
+      }
+
+      setProofFile(null);
+      if (proofInputRef.current) proofInputRef.current.value = "";
+      await fetchOrderDetails({ quiet: true });
+    } catch (uploadError) {
+      setProofError(uploadError.message || "Could not upload payment screenshot.");
+    } finally {
+      setUploadingProof(false);
     }
   };
 
@@ -60,7 +98,11 @@ export default function OrderConfirmationPage({ params }) {
     if (orderId) {
       fetchOrderDetails();
     }
-  }, [orderId]);
+    const refreshTimer = setInterval(() => {
+      if (orderId) fetchOrderDetails({ quiet: true });
+    }, 15000);
+    return () => clearInterval(refreshTimer);
+  }, [orderId, fetchOrderDetails]);
 
   const copyUPI = (upiId) => {
     if (!upiId) return;
@@ -173,13 +215,15 @@ export default function OrderConfirmationPage({ params }) {
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-semibold uppercase tracking-wider">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Order Received</span>
+              <span>{order.paymentStatus === "Paid" ? "Order Placed" : "Order Received"}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Thank You, {order.customer.name}!
             </h1>
             <p className="text-emerald-100 text-sm max-w-xl">
-              Your order <span className="font-bold font-mono text-white">#{order.orderId}</span> has been registered in our system. Complete your payment below to expedite dispatch.
+              {order.paymentStatus === "Paid"
+                ? <>Payment verified. Order <span className="font-bold font-mono text-white">#{order.orderId}</span> is placed and its delivery tracking is active.</>
+                : <>Order <span className="font-bold font-mono text-white">#{order.orderId}</span> is reserved. Pay by UPI and upload the screenshot; tracking starts after admin verification.</>}
             </p>
           </div>
 
@@ -189,7 +233,11 @@ export default function OrderConfirmationPage({ params }) {
               ₹{order.total}
             </p>
             <p className="text-[11px] text-emerald-200 mt-1">
-              Estimated Delivery: <strong>{tracking?.estimatedDeliveryFormatted || "Within 3 Days"}</strong>
+              {order.paymentStatus === "Paid" ? (
+                <>Estimated Delivery: <strong>{tracking?.estimatedDeliveryFormatted || "Being calculated"}</strong></>
+              ) : (
+                <strong>Tracking begins after payment verification</strong>
+              )}
             </p>
           </div>
         </div>
@@ -209,13 +257,15 @@ export default function OrderConfirmationPage({ params }) {
                 </p>
               </div>
 
-              <span
-                className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                  order.paymentStatus === "Paid"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-amber-100 text-amber-700"
-                }`}
-              >
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                order.paymentStatus === "Paid"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : order.paymentStatus === "Proof Submitted"
+                  ? "bg-indigo-100 text-indigo-700"
+                  : order.paymentStatus === "Proof Rejected"
+                  ? "bg-red-100 text-red-700"
+                  : "bg-amber-100 text-amber-700"
+              }`}>
                 {order.paymentStatus}
               </span>
             </div>
@@ -295,6 +345,55 @@ export default function OrderConfirmationPage({ params }) {
               <span>Pay with Installed UPI App</span>
             </a>
 
+            {/* Payment screenshot upload */}
+            {order.paymentStatus === "Paid" ? (
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
+                Payment verified by the store. Your order is placed.
+              </div>
+            ) : (
+              <form onSubmit={handleUploadProof} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Payment Screenshot</h4>
+                  <p className="text-xs text-slate-600 mt-1">
+                    {order.paymentStatus === "Proof Submitted"
+                      ? "Screenshot received. Waiting for the store to verify your payment."
+                      : order.paymentStatus === "Proof Rejected"
+                      ? "The store could not verify the last screenshot. Upload a clear, correct proof and try again."
+                      : "After paying, upload a screenshot of the successful UPI transaction."}
+                  </p>
+                </div>
+
+                {order.paymentProof?.hasImage && order.paymentStatus === "Proof Submitted" && (
+                  <p className="text-xs font-semibold text-indigo-700">Screenshot is received and waiting for verification.</p>
+                )}
+                {order.paymentProof?.reviewNote && order.paymentStatus === "Proof Rejected" && (
+                  <p className="text-xs text-red-700">Store note: {order.paymentProof.reviewNote}</p>
+                )}
+
+                <input
+                  ref={proofInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                  capture="environment"
+                  onChange={(event) => {
+                    setProofFile(event.target.files?.[0] || null);
+                    setProofError("");
+                  }}
+                  className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-2 file:font-semibold file:text-indigo-700"
+                />
+                <p className="text-[11px] text-slate-500">JPEG, PNG, WebP, or HEIC; maximum 5 MB.</p>
+                {proofError && <p role="alert" className="text-xs text-red-600">{proofError}</p>}
+                <button
+                  type="submit"
+                  disabled={uploadingProof || !proofFile}
+                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2"
+                >
+                  {uploadingProof ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  <span>{uploadingProof ? "Uploading proof..." : order.paymentStatus === "Proof Submitted" ? "Replace Screenshot" : "Upload Payment Proof"}</span>
+                </button>
+              </form>
+            )}
+
             {/* WhatsApp Confirmation Button */}
             <a
               href={whatsappUrl}
@@ -303,7 +402,7 @@ export default function OrderConfirmationPage({ params }) {
               className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition shadow-md flex items-center justify-center gap-2"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Confirm / Send Screenshot on WhatsApp</span>
+              <span>Need payment help? Chat on WhatsApp</span>
             </a>
           </div>
 
@@ -323,10 +422,25 @@ export default function OrderConfirmationPage({ params }) {
               <div className="text-right">
                 <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
                   <Navigation className="w-3 h-3 text-indigo-600" />
-                  <span>{tracking?.currentStatus || "Confirmed"}</span>
+                  <span>{tracking?.currentStatus || "Awaiting Payment Verification"}</span>
                 </span>
               </div>
             </div>
+
+            {order.paymentStatus !== "Paid" ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center space-y-2">
+                <Clock className="w-8 h-8 mx-auto text-amber-600" />
+                <h4 className="font-bold text-amber-950">
+                  {order.paymentStatus === "Proof Submitted" ? "Payment proof under review" : "Tracking starts after payment verification"}
+                </h4>
+                <p className="text-sm text-amber-800">
+                  {order.paymentStatus === "Proof Submitted"
+                    ? "The store will verify your UPI screenshot. Once approved, your order will be placed and live tracking will begin."
+                    : "Complete the UPI payment and upload its screenshot. Your order is not marked placed until the store approves the proof."}
+                </p>
+              </div>
+            ) : (
+              <>
 
             {/* Progress Bar */}
             <div>
@@ -410,6 +524,8 @@ export default function OrderConfirmationPage({ params }) {
               </p>
               <p className="text-gray-500 pt-0.5">Phone: +{order.customer.phone}</p>
             </div>
+              </>
+            )}
           </div>
         </div>
 

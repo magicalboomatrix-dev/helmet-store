@@ -3,6 +3,7 @@ import connectToDatabase from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Settings from "@/models/Settings";
 import { calculateOrderTracking } from "@/lib/trackingEngine";
+import { isAdminRequest } from "@/lib/adminAuth";
 
 export async function GET(request, { params }) {
   try {
@@ -35,10 +36,19 @@ export async function GET(request, { params }) {
 
     // Calculate automated delivery milestones
     const tracking = calculateOrderTracking(order, settings);
+    const safeOrder = order.toObject();
+    if (safeOrder.paymentProof) {
+      safeOrder.paymentProof = {
+        submittedAt: safeOrder.paymentProof.submittedAt,
+        reviewNote: safeOrder.paymentProof.reviewNote,
+        reviewedAt: safeOrder.paymentProof.reviewedAt,
+        hasImage: Boolean(safeOrder.paymentProof.imageUrl),
+      };
+    }
 
     return NextResponse.json({
       success: true,
-      order,
+      order: safeOrder,
       tracking,
       settings: {
         upiId: settings.upiId || "helmetstore@upi",
@@ -57,11 +67,22 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ success: false, error: "Admin sign-in required." }, { status: 401 });
+  }
+
   try {
     await connectToDatabase();
     const { id } = await params;
     const body = await request.json();
     const { paymentStatus, trackingStatus, notes } = body;
+
+    if (paymentStatus === "Paid") {
+      return NextResponse.json(
+        { success: false, error: "Verify the uploaded payment proof to mark this order paid." },
+        { status: 400 }
+      );
+    }
 
     const updateData = {};
     if (paymentStatus) updateData.paymentStatus = paymentStatus;
@@ -96,6 +117,10 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ success: false, error: "Admin sign-in required." }, { status: 401 });
+  }
+
   try {
     await connectToDatabase();
     const { id } = await params;

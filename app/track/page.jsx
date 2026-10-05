@@ -174,6 +174,10 @@ function TrackOrderContent() {
                         className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                           order.paymentStatus === "Paid"
                             ? "bg-emerald-100 text-emerald-800"
+                            : order.paymentStatus === "Proof Submitted"
+                            ? "bg-indigo-100 text-indigo-800"
+                            : order.paymentStatus === "Proof Rejected"
+                            ? "bg-red-100 text-red-800"
                             : "bg-amber-100 text-amber-800"
                         }`}
                       >
@@ -187,10 +191,12 @@ function TrackOrderContent() {
 
                   <div className="sm:text-right">
                     <p className="text-xs text-gray-400 uppercase font-semibold">
-                      Estimated Delivery
+                      {order.paymentStatus === "Paid" ? "Estimated Delivery" : "Order Status"}
                     </p>
                     <p className="text-base font-bold text-gray-900">
-                      {tracking?.estimatedDeliveryFormatted || "Within 3 Days"}
+                      {order.paymentStatus === "Paid"
+                        ? tracking?.estimatedDeliveryFormatted || "Being calculated"
+                        : tracking?.currentStatus || "Awaiting Payment Verification"}
                     </p>
                     <Link
                       href={`/order/${order.orderId}`}
@@ -202,6 +208,8 @@ function TrackOrderContent() {
                   </div>
                 </div>
 
+                {order.paymentStatus === "Paid" ? (
+                <>
                 {/* Progress Bar */}
                 <div>
                   <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
@@ -276,6 +284,23 @@ function TrackOrderContent() {
                     );
                   })}
                 </div>
+                </>
+                ) : (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center space-y-2">
+                    <Clock className="w-8 h-8 mx-auto text-amber-600" />
+                    <h3 className="font-bold text-amber-950">
+                      {order.paymentStatus === "Proof Submitted" ? "Payment proof is under review" : "Tracking will start after payment verification"}
+                    </h3>
+                    <p className="text-sm text-amber-800">
+                      {order.paymentStatus === "Proof Submitted"
+                        ? "The store will review the uploaded screenshot. Once approved, the order will be placed and tracking will activate."
+                        : "Pay using the UPI QR code and upload your payment screenshot from the order page."}
+                    </p>
+                    <Link href={`/order/${order.orderId}`} className="inline-flex text-sm font-semibold text-indigo-700 underline">
+                      Open payment and order page
+                    </Link>
+                  </div>
+                )}
 
                 {/* Delivery Address & Items Footer */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100 text-xs">

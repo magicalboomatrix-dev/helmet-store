@@ -1,41 +1,38 @@
 import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/mongodb";
 import Product from "@/models/Product";
-import { PRODUCTS } from "@/app/data/data";
 
 export async function GET() {
   try {
     await connectToDatabase();
-    let products = await Product.find({}).sort({ createdAt: -1 });
-
-    if (products.length === 0) {
-      const formattedProducts = PRODUCTS.map((p) => ({
-        name: p.name,
-        price: p.price,
-        img: p.img,
-        images: [p.img],
-        desc: p.desc,
-        features: p.features || [],
-        rating: p.rating || 4.8,
-        stock: p.stock ?? 10,
-        colors: p.colors || [],
-        weight: p.weight || "1.3 kg",
-        isFeatured: p.id === 5 || p.id === 1,
-      }));
-      products = await Product.insertMany(formattedProducts);
-    }
+    const products = await Product.find({}).sort({ createdAt: -1 });
 
     return NextResponse.json({ success: true, products });
   } catch (error) {
     console.error("GET /api/products error:", error);
+    return NextResponse.json(
+      { success: false, products: [], error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE() {
+  try {
+    await connectToDatabase();
+    const result = await Product.deleteMany({});
+
     return NextResponse.json({
-      success: false,
-      products: PRODUCTS.map((p) => ({
-        ...p,
-        images: [p.img],
-      })),
-      error: error.message,
+      success: true,
+      deletedCount: result.deletedCount,
+      message: `Deleted ${result.deletedCount} products.`,
     });
+  } catch (error) {
+    console.error("DELETE /api/products error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -77,10 +74,10 @@ export async function POST(request) {
       images: imageList,
       desc: desc ? desc.trim() : "",
       features: Array.isArray(features) ? features : [],
-      rating: rating ? Number(rating) : 4.8,
-      stock: stock !== undefined ? Number(stock) : 10,
+      rating: rating !== undefined ? Number(rating) : 0,
+      stock: stock !== undefined ? Number(stock) : 0,
       colors: Array.isArray(colors) ? colors : [],
-      weight: weight ? weight.trim() : "1.3 kg",
+      weight: weight ? weight.trim() : "",
       isFeatured: Boolean(isFeatured),
     });
 

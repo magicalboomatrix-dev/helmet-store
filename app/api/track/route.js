@@ -47,8 +47,17 @@ export async function GET(request) {
 
     const results = orders.map((order) => {
       const tracking = calculateOrderTracking(order, settings);
+      const safeOrder = order.toObject();
+      if (safeOrder.paymentProof) {
+        safeOrder.paymentProof = {
+          submittedAt: safeOrder.paymentProof.submittedAt,
+          reviewNote: safeOrder.paymentProof.reviewNote,
+          reviewedAt: safeOrder.paymentProof.reviewedAt,
+          hasImage: Boolean(safeOrder.paymentProof.imageUrl),
+        };
+      }
       return {
-        order,
+        order: safeOrder,
         tracking,
       };
     });
