@@ -137,10 +137,16 @@ export default function OrderConfirmationPage({ params }) {
           </p>
           <div className="pt-2 flex flex-col gap-2">
             <Link
-              href="/track"
+              href={`/account?returnTo=${encodeURIComponent(`/order/${orderId}`)}`}
               className="w-full py-2.5 bg-indigo-600 text-white font-semibold text-sm rounded-xl hover:bg-indigo-700 transition"
             >
-              Search Order Tracking
+              Sign in to view this order
+            </Link>
+            <Link
+              href="/track"
+              className="w-full py-2.5 text-gray-600 hover:text-gray-900 text-sm font-medium"
+            >
+              Search Your Order
             </Link>
             <Link
               href="/"

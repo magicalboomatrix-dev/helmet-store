@@ -3,6 +3,7 @@ import connectToDatabase from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import { isAdminRequest } from "@/lib/adminAuth";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 export async function GET(request) {
   if (!isAdminRequest(request)) {
@@ -37,6 +38,10 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const customerSession = getCustomerSession(request);
+    if (!customerSession) {
+      return NextResponse.json({ success: false, error: "Sign in or create an account before placing an order." }, { status: 401 });
+    }
     await connectToDatabase();
     const body = await request.json();
     const { customer, items, paymentMethod = "UPI" } = body;
@@ -77,10 +82,11 @@ export async function POST(request) {
 
     const order = await Order.create({
       orderId,
+      customerAccountId: customerSession.userId,
       customer: {
         name: customer.name.trim(),
         phone: customer.phone.trim(),
-        email: customer.email ? customer.email.trim() : "",
+        email: customerSession.email,
         address: customer.address.trim(),
         city: customer.city.trim(),
         state: customer.state ? customer.state.trim() : "India",

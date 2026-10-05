@@ -3,8 +3,16 @@ import connectToDatabase from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Settings from "@/models/Settings";
 import { calculateOrderTracking } from "@/lib/trackingEngine";
+import { getCustomerSession } from "@/lib/customerAuth";
+import { isAdminRequest } from "@/lib/adminAuth";
 
 export async function GET(request) {
+  const customerSession = getCustomerSession(request);
+  const isAdmin = isAdminRequest(request);
+  if (!customerSession && !isAdmin) {
+    return NextResponse.json({ success: false, error: "Sign in to view your order tracking." }, { status: 401 });
+  }
+
   try {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
@@ -31,7 +39,12 @@ export async function GET(request) {
       filter.$or.push({ "customer.phone": { $regex: cleanedDigits, $options: "i" } });
     }
 
-    const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(5);
+    const orders = await Order.find({
+      ...filter,
+      ...(customerSession ? { customerAccountId: customerSession.userId } : {}),
+    })
+      .sort({ createdAt: -1 })
+      .limit(5);
 
     if (orders.length === 0) {
       return NextResponse.json(

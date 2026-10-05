@@ -4,6 +4,7 @@ import Order from "@/models/Order";
 import Settings from "@/models/Settings";
 import { calculateOrderTracking } from "@/lib/trackingEngine";
 import { isAdminRequest } from "@/lib/adminAuth";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 export async function GET(request, { params }) {
   try {
@@ -21,6 +22,11 @@ export async function GET(request, { params }) {
         { success: false, error: "Order not found" },
         { status: 404 }
       );
+    }
+
+    const customerSession = getCustomerSession(request);
+    if (!isAdminRequest(request) && (!customerSession || order.customerAccountId !== customerSession.userId)) {
+      return NextResponse.json({ success: false, error: "Sign in with the account that placed this order to view its details." }, { status: 403 });
     }
 
     // Fetch settings for UPI and WhatsApp

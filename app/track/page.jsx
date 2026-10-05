@@ -109,7 +109,7 @@ function TrackOrderContent() {
             Track Your Helmet Order
           </h1>
           <p className="text-sm text-gray-500 max-w-lg mx-auto">
-            Enter your <strong>Order ID</strong> (e.g. HS-10492) or <strong>10-digit mobile number</strong> to check real-time milestone history and shipment status.
+            Sign in to your customer account, then enter an <strong>Order ID</strong> or your registered mobile number to view your own shipment updates.
           </p>
 
           {/* Search Box Form */}
@@ -151,7 +151,12 @@ function TrackOrderContent() {
         {error && (
           <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-3 shadow-sm max-w-xl mx-auto">
             <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-            <span>{error}</span>
+            <div>
+              <span>{error}</span>
+              {error.toLowerCase().includes("sign in") && (
+                <Link href="/account?returnTo=%2Ftrack" className="ml-2 font-semibold underline">Sign in</Link>
+              )}
+            </div>
           </div>
         )}
 

@@ -3,6 +3,7 @@ import connectToDatabase from "@/lib/mongodb";
 import cloudinary from "@/lib/cloudinary";
 import Order from "@/models/Order";
 import { isAdminRequest } from "@/lib/adminAuth";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -28,6 +29,10 @@ export async function POST(request, { params }) {
 
     if (!order) {
       return NextResponse.json({ success: false, error: "Order not found." }, { status: 404 });
+    }
+    const customerSession = getCustomerSession(request);
+    if (!customerSession || order.customerAccountId !== customerSession.userId) {
+      return NextResponse.json({ success: false, error: "Sign in with the account that placed this order to upload proof." }, { status: 403 });
     }
     if (order.paymentStatus === "Paid") {
       return NextResponse.json({ success: false, error: "This order has already been verified as paid." }, { status: 409 });

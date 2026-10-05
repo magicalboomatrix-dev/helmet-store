@@ -24,6 +24,7 @@ const OrderSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    customerAccountId: { type: String, required: false, index: true },
     customer: {
       name: { type: String, required: true, trim: true },
       phone: { type: String, required: true, trim: true },

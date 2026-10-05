@@ -45,6 +45,19 @@ export default function CartDrawer({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [customerAccount, setCustomerAccount] = useState(null);
+  const [accountMode, setAccountMode] = useState("login");
+  const [accountName, setAccountName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/account/session")
+      .then((response) => response.json())
+      .then((data) => setCustomerAccount(data.customer || null))
+      .catch(() => setCustomerAccount(null));
+  }, []);
 
   const formatINR = (v) =>
     new Intl.NumberFormat("en-IN", {
@@ -128,6 +141,11 @@ export default function CartDrawer({
     e.preventDefault();
     setErrorMsg("");
 
+    if (!customerAccount) {
+      setErrorMsg("Sign in or create an account before placing your order.");
+      return;
+    }
+
     if (!formData.name.trim() || !formData.phone.trim() || !formData.address.trim() || !formData.city.trim()) {
       setErrorMsg("Please fill in your name, phone, address, and city.");
       return;
@@ -167,6 +185,33 @@ export default function CartDrawer({
       setErrorMsg(err.message || "Failed to place order. Please try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCheckoutAuth = async (event) => {
+    event.preventDefault();
+    setAccountBusy(true);
+    setErrorMsg("");
+    try {
+      const response = await fetch("/api/account/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: accountMode,
+          name: accountName || formData.name,
+          email: accountEmail,
+          password: accountPassword,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "Could not sign in.");
+      setCustomerAccount(data.customer);
+      setAccountPassword("");
+      setFormData((previous) => ({ ...previous, email: data.customer.email }));
+    } catch (authError) {
+      setErrorMsg(authError.message || "Could not sign in.");
+    } finally {
+      setAccountBusy(false);
     }
   };
 
@@ -337,6 +382,34 @@ export default function CartDrawer({
             </button>
           </div>
 
+          <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/40">
+            {customerAccount ? (
+              <p className="text-xs text-indigo-900 dark:text-indigo-200">
+                Signed in as <strong>{customerAccount.email}</strong>. This order will be saved in your account history.
+              </p>
+            ) : (
+              <form onSubmit={handleCheckoutAuth} className="space-y-2.5">
+                <div>
+                  <p className="text-sm font-semibold text-indigo-950 dark:text-indigo-100">Sign in to save your order history</p>
+                  <p className="text-xs text-indigo-800 dark:text-indigo-300">Your order details and tracking will be available from your account.</p>
+                </div>
+                {accountMode === "register" && (
+                  <input required value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Your name" autoComplete="name" className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-900" />
+                )}
+                <input required type="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} placeholder="Email address" autoComplete="email" className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-900" />
+                <input required type="password" minLength={10} maxLength={128} value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} placeholder="Password (10+ characters)" autoComplete={accountMode === "login" ? "current-password" : "new-password"} className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-900" />
+                <div className="flex items-center justify-between gap-2">
+                  <button type="button" onClick={() => setAccountMode(accountMode === "login" ? "register" : "login")} className="text-xs font-semibold text-indigo-700 underline dark:text-indigo-300">
+                    {accountMode === "login" ? "Create account" : "Already have an account? Sign in"}
+                  </button>
+                  <button type="submit" disabled={accountBusy} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">
+                    {accountBusy ? "Please wait…" : accountMode === "login" ? "Sign in" : "Create account"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
           {/* Form Error Banner */}
           {errorMsg && (
             <div className="mt-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
@@ -477,7 +550,7 @@ export default function CartDrawer({
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !customerAccount}
                 className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm sm:text-base transition shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
@@ -488,7 +561,7 @@ export default function CartDrawer({
                 ) : (
                   <>
                     <ShieldCheck className="w-4 h-4" />
-                    <span>Confirm Order & Pay {formatINR(subtotal)}</span>
+                    <span>{customerAccount ? `Confirm Order & Pay ${formatINR(subtotal)}` : "Sign in to place your order"}</span>
                   </>
                 )}
               </button>

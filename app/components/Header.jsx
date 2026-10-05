@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { ShoppingCart, Search, X, Truck } from "lucide-react";
+import { ShoppingCart, Search, X, Truck, UserRound } from "lucide-react";
 
 export default function Header({
   cartCount = 0,
@@ -110,6 +110,16 @@ export default function Header({
           >
             <Truck size={17} />
             <span className="hidden md:inline text-sm font-medium">Track</span>
+          </Link>
+
+          <Link
+            href="/account"
+            className="flex items-center gap-1.5 bg-white/90 border border-gray-200 px-3 py-2 rounded-full shadow-sm hover:shadow-md hover:border-indigo-300 transition-all flex-shrink-0 text-gray-700 hover:text-indigo-600"
+            aria-label="Account and order history"
+            title="Account and order history"
+          >
+            <UserRound size={17} />
+            <span className="hidden md:inline text-sm font-medium">Account</span>
           </Link>
 
           {/* Cart */}
