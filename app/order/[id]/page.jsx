@@ -9,22 +9,19 @@ import {
   Clock,
   MapPin,
   Truck,
-  Package,
   Copy,
   Check,
   MessageCircle,
-  ExternalLink,
-  ShieldCheck,
-  ChevronRight,
-  ArrowLeft,
   RefreshCw,
   AlertCircle,
   QrCode,
   Smartphone,
   Navigation,
   Upload,
+  ImageIcon,
+  X,
 } from "lucide-react";
-import { formatImageUrl } from "@/lib/imageUtils";
+import { formatImageUrl, compressImageClient } from "@/lib/imageUtils";
 
 export default function OrderConfirmationPage({ params }) {
   const unwrappedParams = use(params);
@@ -37,6 +34,7 @@ export default function OrderConfirmationPage({ params }) {
   const [error, setError] = useState("");
   const [copiedUPI, setCopiedUPI] = useState(false);
   const [proofFile, setProofFile] = useState(null);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [proofError, setProofError] = useState("");
   const proofInputRef = useRef(null);
@@ -63,31 +61,106 @@ export default function OrderConfirmationPage({ params }) {
     }
   }, [orderId]);
 
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setProofError("");
+    if (!file) {
+      setProofFile(null);
+      if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
+      setProofPreviewUrl(null);
+      return;
+    }
+
+    if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
+    try {
+      setProofPreviewUrl(URL.createObjectURL(file));
+    } catch {
+      setProofPreviewUrl(null);
+    }
+    setProofFile(file);
+  };
+
+  const handleClearSelectedProof = () => {
+    if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
+    setProofPreviewUrl(null);
+    setProofFile(null);
+    setProofError("");
+    if (proofInputRef.current) proofInputRef.current.value = "";
+  };
+
+  useEffect(() => {
+    return () => {
+      if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
+    };
+  }, [proofPreviewUrl]);
+
   const handleUploadProof = async (event) => {
     event.preventDefault();
     if (!proofFile) {
-      setProofError("Choose your payment screenshot first.");
+      setProofError("Choose your payment screenshot from Gallery first.");
       return;
     }
 
     setUploadingProof(true);
     setProofError("");
     try {
+      // 1. Client-side compression to avoid Vercel 4.5 MB payload limit (prevents 413 Request Entity Too Large)
+      let fileToSend = proofFile;
+      try {
+        fileToSend = await compressImageClient(proofFile, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          quality: 0.82,
+        });
+      } catch (compErr) {
+        console.warn("Client compression skipped:", compErr);
+      }
+
+      // 2. Size guard
+      if (fileToSend.size > 4.2 * 1024 * 1024) {
+        throw new Error("Screenshot is too large (maximum 4 MB). Please select a smaller image.");
+      }
+
       const payload = new FormData();
-      payload.append("proof", proofFile);
+      payload.append("proof", fileToSend);
+
       const response = await fetch(`/api/orders/${orderId}/payment-proof`, {
         method: "POST",
         body: payload,
       });
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Could not upload payment screenshot.");
+
+      // 3. Robust error/JSON handling
+      let data = null;
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
       }
 
+      if (!response.ok || !data?.success) {
+        if (response.status === 413) {
+          throw new Error("File size is too large for upload. Please choose a smaller image.");
+        }
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+        const text = !data ? await response.text().catch(() => "") : "";
+        if (text.includes("Request Entity Too Large") || text.includes("413")) {
+          throw new Error("File size is too large. Please select a smaller screenshot.");
+        }
+        throw new Error(data?.error || `Upload failed (Status ${response.status}). Please try again.`);
+      }
+
+      if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
+      setProofPreviewUrl(null);
       setProofFile(null);
       if (proofInputRef.current) proofInputRef.current.value = "";
       await fetchOrderDetails({ quiet: true });
     } catch (uploadError) {
+      console.error("Payment proof upload error:", uploadError);
       setProofError(uploadError.message || "Could not upload payment screenshot.");
     } finally {
       setUploadingProof(false);
@@ -353,8 +426,9 @@ export default function OrderConfirmationPage({ params }) {
 
             {/* Payment screenshot upload */}
             {order.paymentStatus === "Paid" ? (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
-                Payment verified by the store. Your order is placed.
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>Payment verified by the store. Your order is placed.</span>
               </div>
             ) : (
               <form onSubmit={handleUploadProof} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
@@ -364,38 +438,91 @@ export default function OrderConfirmationPage({ params }) {
                     {order.paymentStatus === "Proof Submitted"
                       ? "Screenshot received. Waiting for the store to verify your payment."
                       : order.paymentStatus === "Proof Rejected"
-                      ? "The store could not verify the last screenshot. Upload a clear, correct proof and try again."
-                      : "After paying, upload a screenshot of the successful UPI transaction."}
+                      ? "The store could not verify the last screenshot. Select a clear proof and try again."
+                      : "After paying, upload a screenshot from your gallery or photos."}
                   </p>
                 </div>
 
                 {order.paymentProof?.hasImage && order.paymentStatus === "Proof Submitted" && (
-                  <p className="text-xs font-semibold text-indigo-700">Screenshot is received and waiting for verification.</p>
+                  <p className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5">
+                    Screenshot is received and waiting for store verification.
+                  </p>
                 )}
                 {order.paymentProof?.reviewNote && order.paymentStatus === "Proof Rejected" && (
-                  <p className="text-xs text-red-700">Store note: {order.paymentProof.reviewNote}</p>
+                  <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2.5">
+                    Store note: {order.paymentProof.reviewNote}
+                  </p>
                 )}
 
-                <input
-                  ref={proofInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-                  capture="environment"
-                  onChange={(event) => {
-                    setProofFile(event.target.files?.[0] || null);
-                    setProofError("");
-                  }}
-                  className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-2 file:font-semibold file:text-indigo-700"
-                />
-                <p className="text-[11px] text-slate-500">JPEG, PNG, WebP, or HEIC; maximum 5 MB.</p>
-                {proofError && <p role="alert" className="text-xs text-red-600">{proofError}</p>}
+                {/* File picker without capture attribute to allow Gallery / Photos selection */}
+                <div>
+                  <input
+                    ref={proofInputRef}
+                    id="payment-proof-input"
+                    type="file"
+                    accept="image/*,image/jpeg,image/png,image/webp,image/heic,image/heif"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  {!proofFile ? (
+                    <label
+                      htmlFor="payment-proof-input"
+                      className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-white rounded-2xl cursor-pointer transition text-center group"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-indigo-50 group-hover:bg-indigo-100 text-indigo-600 flex items-center justify-center mb-2 transition">
+                        <ImageIcon className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-semibold text-indigo-700 group-hover:text-indigo-800">
+                        Choose Screenshot from Gallery
+                      </span>
+                      <span className="text-[11px] text-slate-500 mt-0.5">
+                        JPEG, PNG, WebP or HEIC • Tap to open gallery
+                      </span>
+                    </label>
+                  ) : (
+                    <div className="p-3 bg-white border border-indigo-200 rounded-2xl flex items-center gap-3">
+                      {proofPreviewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={proofPreviewUrl}
+                          alt="Screenshot Preview"
+                          className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-50"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                          <ImageIcon className="w-6 h-6" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-800 truncate">
+                          {proofFile.name}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          {(proofFile.size / 1024).toFixed(0)} KB • Ready to upload
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleClearSelectedProof}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition shrink-0"
+                        title="Remove or choose another screenshot"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-slate-500">Auto-compressed for fast upload. Max 10 MB.</p>
+                {proofError && <p role="alert" className="text-xs text-red-600 font-medium">{proofError}</p>}
                 <button
                   type="submit"
                   disabled={uploadingProof || !proofFile}
-                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2"
+                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 shadow-sm"
                 >
                   {uploadingProof ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  <span>{uploadingProof ? "Uploading proof..." : order.paymentStatus === "Proof Submitted" ? "Replace Screenshot" : "Upload Payment Proof"}</span>
+                  <span>{uploadingProof ? "Compressing & uploading..." : order.paymentStatus === "Proof Submitted" ? "Replace Screenshot" : "Upload Payment Proof"}</span>
                 </button>
               </form>
             )}

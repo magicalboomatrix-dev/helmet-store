@@ -8,6 +8,7 @@ import { getCustomerSession } from "@/lib/customerAuth";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
   "image/heic",
@@ -31,8 +32,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, error: "Order not found." }, { status: 404 });
     }
     const customerSession = getCustomerSession(request);
-    if (!customerSession || order.customerAccountId !== customerSession.userId) {
+    if (!customerSession) {
       return NextResponse.json({ success: false, error: "Sign in with the account that placed this order to upload proof." }, { status: 403 });
+    }
+    if (order.customerAccountId && order.customerAccountId !== customerSession.userId) {
+      return NextResponse.json({ success: false, error: "Sign in with the account that placed this order to upload proof." }, { status: 403 });
+    }
+    if (!order.customerAccountId && customerSession.userId) {
+      order.customerAccountId = customerSession.userId;
     }
     if (order.paymentStatus === "Paid") {
       return NextResponse.json({ success: false, error: "This order has already been verified as paid." }, { status: 409 });
@@ -43,8 +50,11 @@ export async function POST(request, { params }) {
     if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
       return NextResponse.json({ success: false, error: "Choose a payment screenshot to upload." }, { status: 400 });
     }
-    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      return NextResponse.json({ success: false, error: "Upload a JPEG, PNG, WebP, or HEIC image." }, { status: 400 });
+    const isImage =
+      (file.type && (file.type.startsWith("image/") || ALLOWED_IMAGE_TYPES.has(file.type))) ||
+      /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || "");
+    if (!isImage) {
+      return NextResponse.json({ success: false, error: "Upload a valid image (JPEG, PNG, WebP, or HEIC)." }, { status: 400 });
     }
     if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ success: false, error: "The screenshot must be smaller than 5 MB." }, { status: 400 });
